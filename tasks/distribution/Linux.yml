@@ -1,6 +1,4 @@
 ---
-# tasks file for skeleton
-
 - name: reformat dict if necessary
   set_fact:
     restic_backups: "{{ restic_backups|dict2items|json_query('[*].value') }}"
@@ -18,8 +16,21 @@
   with_items: '{{ restic_backups }}'
   when:
     - item.name is defined
-    - item.src is defined or item.stdin is defined
-    - item.src is defined or item.stdin and item.stdin_cmd is defined
+    - item.src is defined or item.srcs is defined or item.stdin is defined
+    - item.src is defined or item.srcs is defined or item.stdin and item.stdin_cmd is defined
+    - item.repo in restic_repos
+
+- name: Create backup sources file
+  template:
+    src: restic_sources_Linux.txt.j2
+    dest: '{{ restic_script_dir }}/backup-{{ item.name }}-sources.txt'
+    mode: '0600'
+    owner: '{{ restic_dir_owner }}'
+    group: '{{ restic_dir_group }}'
+  with_items: '{{ restic_backups }}'
+  when:
+    - item.name is defined
+    - item.srcs is defined
     - item.repo in restic_repos
 
 - name: Create backup script
@@ -33,8 +44,8 @@
   with_items: '{{ restic_backups }}'
   when:
     - item.name is defined
-    - item.src is defined or item.stdin is defined
-    - item.src is defined or item.stdin and item.stdin_cmd is defined
+    - item.src is defined or item.srcs is defined or item.stdin is defined
+    - item.src is defined or item.srcs is defined or item.stdin and item.stdin_cmd is defined
     - item.repo in restic_repos
 
 - name: Setup CRON jobs

@@ -1,0 +1,17 @@
+# Test data
+restic_repos:
+  testrepo:
+    location: "rest:https://user:password@example.com:8000/user"
+    password: foo
+
+restic_backups:
+  - name: data1
+    repo: testrepo
+    src: "/usr/local"
+    srcs:
+       - "/etc"
+       - "/home"
+       - "/opt"
+  - name: data2
+    repo: testrepo
+    src: "/usr"

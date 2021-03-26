@@ -1,1 +1,4 @@
 .DS_Store
+.vagrant
+vault-passwd
+py38-ar

@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# Backup source list for {{ item.name }}
+
+{% for src in item.srcs %}
+{{ src }}
+{% endfor %}

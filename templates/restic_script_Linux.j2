@@ -12,7 +12,9 @@
 {% endif %}
 
 export RESTIC_REPOSITORY={{ restic_repos[item.repo].location }}
+{% if restic_repos[item.repo].password is defined %}
 export RESTIC_PASSWORD='{{ restic_repos[item.repo].password | regex_replace('\'', '\'\\\'\'') }}'
+{% endif %}
 BACKUP_NAME={{ item.name }}
 {% if restic_repos[item.repo].aws_access_key is defined %}
 export AWS_ACCESS_KEY_ID={{ restic_repos[item.repo].aws_access_key }}
@@ -29,9 +31,18 @@ export B2_ACCOUNT_ID={{ restic_repos[item.repo].b2_account_id }}
 {% if restic_repos[item.repo].b2_account_key is defined %}
 export B2_ACCOUNT_KEY={{ restic_repos[item.repo].b2_account_key }}
 {% endif %}
+
 {% if item.src is defined %}
 BACKUP_SOURCE={{ item.src }}
+{% else %}
+BACKUP_SOURCE=""
 {% endif %}
+{% if item.srcs is defined %}
+BACKUP_FILE_SOURCE='--files-from {{ restic_script_dir }}/backup-{{ item.name }}-sources.txt'
+{% else %}
+BACKUP_FILE_SOURCE=""
+{% endif %}
+
 set -uxo pipefail
 {#
   Define Tags
@@ -60,9 +71,6 @@ set -uxo pipefail
 {#
   Define path
 #}
-{% macro path(repo) -%}
-  {% if repo.src is defined and repo.src != None and (repo.src|length>0)  %}{{ repo.src }}{% else %}{{ repo.stdin_filename }}{% endif %}
-{%- endmacro %}
 {#
   Define retention pattern
 #}
@@ -119,7 +127,7 @@ fi
     {% if item.exclude is defined %}{{ exclude(item.exclude) }}{% endif %} \
     $@ \
 {% else %}
-  {{ restic_install_path }}/restic backup $BACKUP_SOURCE $MODE_TAG \
+  {{ restic_install_path }}/restic backup $BACKUP_SOURCE $BACKUP_FILE_SOURCE $MODE_TAG \
     {{ tags(item.tags) }} \
     {% if item.exclude is defined %}{{ exclude(item.exclude) }}{% endif %} \
     $@ \
@@ -131,10 +139,29 @@ else
     echo "$(date -u '+%Y-%m-%d %H:%M:%S') ERROR" >> {{ backup_result_log }}
 fi
 
+{% if item.prune is defined and item.prune == true %}
+PRUNE_MODE=--prune
+{% else %}
+PRUNE_MODE=""
+{% endif %}
+
+{% if item.src is defined and item.src != None and (item.src|length>0) %}
+FORGET_FILE=--path {{ item.src }}
+{% elif item.srcs is not defined or item.srcs == None or (item.srcs|length==0) %}
+FORGET_FILE=--path {{ item.stdin_filename }}
+{% else %}
+FORGET_FILE=""
+{% endif %}
+{% if item.srcs is defined and item.srcs != None and (item.srcs|length>0) %}
+FORGET_FILE_SET=`cat $BACKUP_FILE_SOURCE |grep -v "^[#]" |grep -v "^$" |awk '// { print "--path", $0; }'|tr -s '\n' ' '`
+{% else %}
+FORGET_FILE_SET=""
+{% endif %}
+
 {#
   Define stdin forget commands
 #}
-{{ restic_install_path }}/restic forget --path {{ path(item) }} {{ retention_pattern(item) }} {% if item.prune is defined and item.prune == true %}--prune{% endif %} | tee {{ forget_output_log }}
+{{ restic_install_path }}/restic forget $FORGET_FILE $FORGET_FILE_SET {{ retention_pattern(item) }} $PRUNE_MODE | tee {{ forget_output_log }}
 if [[ $? -eq 0 ]]
 then
     echo "$(date -u '+%Y-%m-%d %H:%M:%S') OK" >> {{ forget_result_log }}

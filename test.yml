@@ -1,0 +1,5 @@
+---
+- hosts: ansible-restic
+  remote_user: root
+  roles:
+    - ansible.restic
